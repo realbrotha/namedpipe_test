@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.10)
-project(untitled)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(untitled main.cpp IpcServer.cpp IpcServer.h named_pipe_wrapper.cpp named_pipe_wrapper.h)
+set(MODULE_NAME server)
+set(SOURCES
+        main.cpp IpcServer.cpp named_pipe_wrapper.cpp)
+
+add_executable(${MODULE_NAME} ${SOURCES})
+set_property(TARGET ${MODULE_NAME} PROPERTY OUTPUT_NAME ${MODULE_NAME})
+
+install(
+        TARGETS ${MODULE_NAME}
+        RUNTIME DESTINATION ${BIN_PATH})
