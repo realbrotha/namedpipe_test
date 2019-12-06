@@ -32,7 +32,7 @@ private :
     bool make_pipe_thread(int code, std::string path = "");
 
     static void* server_proc(void* arg);
-    std::map<int, struct pipe_info> pipe_list_;
+    std::map<int, struct pipe_info> m_pipe_list;
 };
 
 struct pipe_single

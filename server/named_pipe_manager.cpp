@@ -104,16 +104,16 @@ bool named_pipe_manager::make_pipe_thread(int code, std::string path)
 
 void named_pipe_manager::set_pipe_info(int code, struct pipe_info &st)
 {
-    pipe_list_.insert(std::make_pair(code, st));
+    m_pipe_list.insert(std::make_pair(code, st));
 }
 
 bool named_pipe_manager::get_pipe_info(int code, struct pipe_info &st)
 {
     bool result = false;
 
-    if(pipe_list_.count(code))
+    if(m_pipe_list.count(code))
     {
-        st = pipe_list_[code];
+        st = m_pipe_list[code];
         result = true;
     }
     return result;
@@ -122,36 +122,36 @@ bool named_pipe_manager::get_pipe_info(int code, struct pipe_info &st)
 void named_pipe_manager::set_single_pipe_info(int code, int type, struct pipe_single &st)
 {
     struct pipe_info base;
-    if(!pipe_list_.count(code))
+    if(!m_pipe_list.count(code))
     {
-        pipe_list_.insert(std::make_pair(code, base));
+        m_pipe_list.insert(std::make_pair(code, base));
     }
     if (type) // send
-        pipe_list_[code].send = st;
+        m_pipe_list[code].send = st;
     else
-        pipe_list_[code].recv = st;
+        m_pipe_list[code].recv = st;
 }
 
 bool named_pipe_manager::get_single_pipe_info(int code, int type, struct pipe_single &st)
 {
     bool result = false;
-    if(pipe_list_.count(code))
+    if(m_pipe_list.count(code))
     {
         if (type) // send
         {
-            if (pipe_list_[code].send.pipe_fd &&
-                !pipe_list_[code].send.pipe_path.empty())
+            if (m_pipe_list[code].send.pipe_fd &&
+                !m_pipe_list[code].send.pipe_path.empty())
             {
-                st = pipe_list_[code].send;
+                st = m_pipe_list[code].send;
                 result = true;
             }
         }
         else // recv
         {
-            if (pipe_list_[code].recv.pipe_fd &&
-                !pipe_list_[code].recv.pipe_path.empty())
+            if (m_pipe_list[code].recv.pipe_fd &&
+                !m_pipe_list[code].recv.pipe_path.empty())
             {
-                st = pipe_list_[code].recv;
+                st = m_pipe_list[code].recv;
                 result = true;
             }
         }
