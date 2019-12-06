@@ -9,48 +9,52 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-int named_pipe_wrapper::create(const std::basic_string<char>& pipe_path, int mode)
+
+bool named_pipe_wrapper::create(const std::string &pipe_path, int mode)
 {
     if (pipe_path.empty())
     {
-        std::cout <<"pipe path wrong";
-        return -1;
+        std::cout << "pipe path wrong";
+        return false;
     }
-    return mkfifo(pipe_path.c_str(), mode);
+    return (mkfifo(pipe_path.c_str(), mode) != -1) ? true : false;
 }
 
-int named_pipe_wrapper::connect(const std::basic_string<char>& pipe_path, bool read_only, bool non_block)
+bool named_pipe_wrapper::connect(const std::string &pipe_path, int &fd, bool read_only, bool non_block)
 {
     if (pipe_path.empty())
     {
-        std::cout <<"pipe path wrong";
-        return -1;
+        std::cout << "pipe path wrong";
+        return false;
     }
-    return open(pipe_path.c_str(), (read_only ? O_RDONLY : O_WRONLY) | (non_block ? O_NONBLOCK : 0));
+    fd = open(pipe_path.c_str(), (read_only ? O_RDONLY : O_WRONLY) | (non_block ? O_NONBLOCK : 0));
+
+    return (fd != -1) ? true : false;
 }
 
-int named_pipe_wrapper::disconnect(int& pipe)
+bool named_pipe_wrapper::disconnect(int &pipe)
 {
-    if (0 >= pipe )
+    if (0 >= pipe)
     {
         std::cout << "wrong fd";
+        return false;
     }
-    return close(pipe);
+    return (close(pipe) != -1) ? true : false;
 }
 
-int named_pipe_wrapper::remove(const std::basic_string<char>& pipePath)
+bool named_pipe_wrapper::remove(const std::string &pipePath)
 {
-    return unlink(pipePath.c_str());
+    return (unlink(pipePath.c_str()) -1) ? true : false;
 }
 
-bool named_pipe_wrapper::send(int send_pipe_fd,  std::basic_string<char> send_string)
+bool named_pipe_wrapper::send(int send_pipe_fd, std::string send_string)
 {
     bool result = false;
-    if (0 >= send_pipe_fd )
+    if (0 >= send_pipe_fd)
     {
         return result;
     }
-    if(write(send_pipe_fd, send_string.c_str(), send_string.length()) != -1)
+    if (write(send_pipe_fd, send_string.c_str(), send_string.length()) != -1)
     {
         result = true;
     }
@@ -58,7 +62,8 @@ bool named_pipe_wrapper::send(int send_pipe_fd,  std::basic_string<char> send_st
     return result;
 }
 
-bool named_pipe_wrapper::send_wait_response(int send_pipe_fd,  std::basic_string<char> send_string, int recv_pipe_fd, int loop_count, std::basic_string<char>& response_string)
+bool named_pipe_wrapper::send_wait_response(int send_pipe_fd, std::string send_string, int recv_pipe_fd,
+                                            int loop_count, std::string &response_string)
 {
     bool result = false;
     if (0 >= send_pipe_fd && 0 >= recv_pipe_fd)
@@ -67,16 +72,16 @@ bool named_pipe_wrapper::send_wait_response(int send_pipe_fd,  std::basic_string
         return result;
     }
 
-    if(write(send_pipe_fd, send_string.c_str(), send_string.length()) != -1)
+    if (write(send_pipe_fd, send_string.c_str(), send_string.length()) != -1)
     {
         while (loop_count--)
         {
             int readSize = 0;
-            char buffer[2048] = {0,};
+            char buffer[2048] = { 0, };
 
             if ((readSize = read(recv_pipe_fd, buffer, sizeof(buffer))) > 0)
             {
-                response_string.assign(buffer,readSize);
+                response_string.assign(buffer, readSize);
                 result = true;
                 break;
             }
