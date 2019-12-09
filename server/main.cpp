@@ -1,4 +1,4 @@
-#include "NamedPipeManager.h"
+#include "NamedPipeServer.h"
 
 #include <iostream>
 #include <stdio.h>
@@ -12,10 +12,11 @@ enum product_list // for test
 };
 
 int main(int argc, char *argv[]) {
-  int code = product_list::EZREAL | SORAKA | ASHE;
+  int code = product_list::EZREAL | product_list::SORAKA | product_list::ASHE;
 
-  bool result = NamedPipeManager::get_instance().Initialize(code);
+  bool result = NamedPipeServer::GetInstance().Initialize(code);
   std::cout << "init ipc result : " << result << "\n";
+  
   while (1) {
     std::cout << "tick tock\n";
     sleep(1);

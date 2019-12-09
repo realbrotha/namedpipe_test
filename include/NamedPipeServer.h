@@ -13,9 +13,9 @@
 
 #define MAXIMUM_PRODUCT_COUNT 3
 
-class NamedPipeManager : public NamedPipeWrapper {
+class NamedPipeServer : public NamedPipeWrapper {
  public :
-  static NamedPipeManager &get_instance();
+  static NamedPipeServer &GetInstance();
 
   bool Initialize(int count, std::string path = "");
   bool Finalize();
@@ -26,7 +26,7 @@ class NamedPipeManager : public NamedPipeWrapper {
   void set_single_pipe_info(int code, int type, struct PipeSingleInfo &st);
   bool get_single_pipe_info(int code, int type, struct PipeSingleInfo &st);
  private :
-  NamedPipeManager() { /* none */ };
+  NamedPipeServer() { /* none */ };
 
   bool MakePipeThreads(int code, std::string path = "");
 
@@ -46,7 +46,7 @@ struct PipePairInfo {
 };
 
 struct ThreadArguments {
-  NamedPipeManager *manager_this;
+  NamedPipeServer *server_this;
   int code;
 };
 

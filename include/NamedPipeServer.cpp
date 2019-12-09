@@ -2,19 +2,19 @@
 // Created by realbro on 12/4/19.
 //
 
-#include "NamedPipeManager.h"
+#include "NamedPipeServer.h"
 
 #include <sys/stat.h>
 #include <iostream>
 #include <unistd.h>
 #include <string.h>
 
-NamedPipeManager &NamedPipeManager::get_instance() {
-  static NamedPipeManager instance_;
+NamedPipeServer &NamedPipeServer::GetInstance() {
+  static NamedPipeServer instance_;
   return instance_;
 }
 
-bool NamedPipeManager::Initialize(int count, std::string path) {
+bool NamedPipeServer::Initialize(int count, std::string path) {
   bool result = false;
   if (count < 0) {
     std::cout << "code failed";
@@ -28,11 +28,11 @@ bool NamedPipeManager::Initialize(int count, std::string path) {
   }
   return result;
 }
-bool NamedPipeManager::Finalize() {
+bool NamedPipeServer::Finalize() {
   //do something
 }
 
-bool NamedPipeManager::MakePipeThreads(int code, std::string path) {
+bool NamedPipeServer::MakePipeThreads(int code, std::string path) {
   std::string base_path;
   base_path = (!path.empty()) ? path : "/tmp";
 
@@ -76,7 +76,7 @@ bool NamedPipeManager::MakePipeThreads(int code, std::string path) {
 
   struct ThreadArguments *thread_arg = new ThreadArguments;
 
-  thread_arg->manager_this = this;
+  thread_arg->server_this = this;
   thread_arg->code = code;
 
   std::cout << "thread code : " << thread_arg->code << code;
@@ -90,11 +90,11 @@ bool NamedPipeManager::MakePipeThreads(int code, std::string path) {
   std::cout << "Initialize finish\n";
 }
 
-void NamedPipeManager::set_pipe_info(int code, struct PipePairInfo &st) {
+void NamedPipeServer::set_pipe_info(int code, struct PipePairInfo &st) {
   m_pipe_list.insert(std::make_pair(code, st));
 }
 
-bool NamedPipeManager::get_pipe_info(int code, struct PipePairInfo &st) {
+bool NamedPipeServer::get_pipe_info(int code, struct PipePairInfo &st) {
   bool result = false;
 
   if (m_pipe_list.count(code)) {
@@ -104,7 +104,7 @@ bool NamedPipeManager::get_pipe_info(int code, struct PipePairInfo &st) {
   return result;
 }
 
-void NamedPipeManager::set_single_pipe_info(int code, int type, struct PipeSingleInfo &st) {
+void NamedPipeServer::set_single_pipe_info(int code, int type, struct PipeSingleInfo &st) {
   struct PipePairInfo base;
   if (!m_pipe_list.count(code)) {
     m_pipe_list.insert(std::make_pair(code, base));
@@ -115,7 +115,7 @@ void NamedPipeManager::set_single_pipe_info(int code, int type, struct PipeSingl
     m_pipe_list[code].recv = st;
 }
 
-bool NamedPipeManager::get_single_pipe_info(int code, int type, struct PipeSingleInfo &st) {
+bool NamedPipeServer::get_single_pipe_info(int code, int type, struct PipeSingleInfo &st) {
   bool result = false;
   if (m_pipe_list.count(code)) {
     if (type) // send
@@ -137,9 +137,9 @@ bool NamedPipeManager::get_single_pipe_info(int code, int type, struct PipeSingl
   return result;
 }
 
-void *NamedPipeManager::PipeThreadProc(void *arg) {
+void *NamedPipeServer::PipeThreadProc(void *arg) {
   ThreadArguments *args = reinterpret_cast<ThreadArguments *>(arg);
-  NamedPipeManager *mgr = args->manager_this;
+  NamedPipeServer *mgr = args->server_this;
   int product_type = static_cast<int>(args->code);
   delete args;
 

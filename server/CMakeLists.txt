@@ -4,11 +4,16 @@ set(CMAKE_CXX_STANDARD 14)
 
 set(MODULE_NAME server)
 set(SOURCES
-        main.cpp IpcServer.cpp NamedPipeWrapper.cpp NamedPipeManager.cpp)
+        main.cpp
+    )
 
-find_package(Threads REQUIRED)
+include_directories(${INC_PATH})
+
 add_executable(${MODULE_NAME} ${SOURCES})
-target_link_libraries(${MODULE_NAME} ${CMAKE_THREAD_LIBS_INIT})
+
+target_link_libraries(${MODULE_NAME}
+        named_pipe)
+
 
 set_property(TARGET ${MODULE_NAME} PROPERTY OUTPUT_NAME ${MODULE_NAME})
 
