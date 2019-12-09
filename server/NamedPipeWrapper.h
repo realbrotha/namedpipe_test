@@ -7,7 +7,7 @@
 
 #include <string>
 
-class named_pipe_wrapper
+class NamedPipeWrapper
 {
 public:
     static bool create(const std::string &pipe_path, int mode = 0666);
