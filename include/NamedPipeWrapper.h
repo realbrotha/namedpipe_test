@@ -7,6 +7,10 @@
 
 #include <string>
 
+#define DEFAULT_PIPE_PATH "/tmp/"
+#define PREFIX_SEND_PIPE_NAME ".send"
+#define PREFIX_RECV_PIPE_NAME ".recv"
+
 class NamedPipeWrapper
 {
 public:

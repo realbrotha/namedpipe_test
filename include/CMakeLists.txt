@@ -4,7 +4,9 @@ set(MODULE_NAME named_pipe)
 
 set(SOURCES
         NamedPipeServer.cpp
-        NamedPipeWrapper.cpp)
+        NamedPipeWrapper.cpp
+        NamedPipeClient.cpp
+        NamedPipeManager.cpp)
 
 add_library(${MODULE_NAME} STATIC ${SOURCES})
 find_package(Threads REQUIRED)
