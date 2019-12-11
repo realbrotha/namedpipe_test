@@ -16,15 +16,26 @@ class NamedPipeManager {
   NamedPipeManager() { /* none */ };
   ~NamedPipeManager();
 
+  bool Initialize(int type, bool mode, std::string path = "");
+  bool SendData(int type, std::string send_data);
+
+  bool RemovePipeThreads(int type);
+
+  bool RunCheckWritePipeThread(int type);
+  bool CheckWritePipe(int type, std::string path);
+
+ private:
   void set_pipe_info(int type, struct PipePairInfo st);
   bool get_pipe_info(int type, struct PipePairInfo &st);
+
+  void set_pipe_thread_info(int type, pthread_t thread);
 
   void set_single_pipe_info(int type, int dest_type, struct PipeSingleInfo st);
   bool get_single_pipe_info(int type, int dest_type, struct PipeSingleInfo &st);
 
-  bool RemovePipeThreads(int type);
-  bool MakePipeThreads(int type, ThreadPtr *ptr, std::string path = "");
- private:
+  static void *PipeThreadProc(void *arg);
+  static void *WritePipeCheckThreadProc(void *arg);
+
   mutex m_mutex;
   std::map<int, struct PipePairInfo> m_pipe_list;
 };
@@ -35,14 +46,21 @@ struct PipeSingleInfo {
 };
 
 struct PipePairInfo {
-  struct PipeSingleInfo send;
-  struct PipeSingleInfo recv;
+  struct PipeSingleInfo read;
+  struct PipeSingleInfo write;
   pthread_t work_thread;
+  pthread_t check_thread;
+};
+
+struct CheckThreadArguments {
+  NamedPipeManager *arg_this;
+  std::string pipe_path;
+  int type;
 };
 
 struct ThreadArguments {
-  NamedPipeManager *server_this;
+  NamedPipeManager *arg_this;
   int code;
+  bool mode;
 };
-
-#endif //TESTPIPE_INCLUDE_NAMEDPIPEMANAGER_H_
+#endif // NAMEDPIPEMANAGER_H_

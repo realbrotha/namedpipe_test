@@ -8,8 +8,8 @@
 #include <string>
 
 #define DEFAULT_PIPE_PATH "/tmp/"
-#define PREFIX_SEND_PIPE_NAME ".send"
-#define PREFIX_RECV_PIPE_NAME ".recv"
+#define PREFIX_SERVER_PIPE_NAME "svr"
+#define PREFIX_CLIENT_PIPE_NAME "cli"
 
 class NamedPipeWrapper
 {

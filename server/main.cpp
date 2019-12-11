@@ -1,4 +1,4 @@
-#include "NamedPipeServer.h"
+#include "NamedPipeManager.h"
 
 #include <iostream>
 #include <stdio.h>
@@ -14,16 +14,22 @@ enum ProductList // for test
 int main(int argc, char *argv[]) {
   int code = ProductList::kEZREAL | ProductList::kSORAKA | ProductList::kASHE;
 
-  bool result = NamedPipeServer::GetInstance().Initialize(code);
+  NamedPipeManager server;
+  bool result = server.Initialize( ProductList::kEZREAL, true);
   std::cout << "init ipc result : " << result << "\n";
 
-  int i = 0;
-  while (1) {
-    std::cout << "tick tock\n";
-    if (++i == 3)
-      NamedPipeServer::GetInstance().RemovePipeThreads(ProductList::kSORAKA);
+  char buffer[100] = {0,};
+  memset(buffer, 0x00, sizeof(buffer));
 
-    sleep(1);
+  while (1) {
+    scanf("%s", &buffer);
+    std::string buff(buffer);
+    server.SendData( ProductList::kEZREAL, buff);
+    if (buff == "quit")
+    {
+      std::cout <<"QUIT!!!!!!!!!!!!!!!!!!!";
+      break;
+    }
   }
   // for test code
   // Not Yet

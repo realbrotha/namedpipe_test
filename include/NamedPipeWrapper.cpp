@@ -14,16 +14,19 @@ bool NamedPipeWrapper::create(const std::string &pipe_path, int mode) {
     std::cout << "pipe path wrong";
     return false;
   }
-  return (mkfifo(pipe_path.c_str(), mode) != -1) ? true : false;
+  int result = mkfifo(pipe_path.c_str(), mode);
+  if (result == -1)
+    printf ("create pipe result: (%d) erro (%d) \n", result, errno);
+  return (result!= -1) ? true : false;
 }
 
 bool NamedPipeWrapper::connect(const std::string &pipe_path, int &fd, bool read_only, bool non_block) {
   if (pipe_path.empty()) {
-    std::cout << "pipe path wrong";
+    std::cout << "connect pipe path wrong\n";
     return false;
   }
-  fd = open(pipe_path.c_str(), (read_only ? O_RDONLY : O_WRONLY) | (non_block ? O_NONBLOCK : 0));
-
+  fd = open(pipe_path.c_str(), O_RDWR | (non_block ? O_NONBLOCK : 0));
+  printf("connect result : (%d) errnor (%d)\n", fd, errno);
   return (fd != -1) ? true : false;
 }
 
@@ -41,13 +44,18 @@ bool NamedPipeWrapper::remove(const std::string &pipePath) {
 
 bool NamedPipeWrapper::send(int send_pipe_fd, std::string send_string) {
   bool result = false;
+  std::cout << "send lower\n";
   if (0 >= send_pipe_fd) {
+    std::cout << "pipe fd wrong\n";
     return result;
   }
   if (write(send_pipe_fd, send_string.c_str(), send_string.length()) != -1) {
+    std::cout << "write success.\n";
     result = true;
+  } else {
+    std::cout << "write failed. " << errno << "\n";
   }
-
+  std::cout << "send fin\n";
   return result;
 }
 
