@@ -1,12 +1,10 @@
 cmake_minimum_required(VERSION 3.5)
 
-set(MODULE_NAME EpollNamedPipe)
+set(MODULE_NAME thread_named_pipe)
 
 set(SOURCES
-        NamedPipeManager.cpp
         NamedPipeWrapper.cpp
-        FileDescriptorTool.cpp
-        StringTool.cpp)
+        NamedPipeManager.cpp)
 
 add_library(${MODULE_NAME} STATIC ${SOURCES})
 find_package(Threads REQUIRED)

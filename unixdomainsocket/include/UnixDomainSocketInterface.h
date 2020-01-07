@@ -6,7 +6,15 @@
 #define TESTEPOLLPIPE_UNIXDOMAINSOCKET_INCLUDE_UNIXDOMAINSOCKETINTERFACE_H_
 
 #include "UnixDomainSocketFactory.h"
+#include "UnixDomainSocketServer.h"
+#include "UnixDomainSocketClient.h"
+
 #include <string>
+
+namespace {
+constexpr unsigned int kINTERFACE_TYPE_SERVER = 1;
+constexpr unsigned int kINTERFACE_TYPE_CLIENT = 2;
+}
 
 class UnixDomainSocketInterface : public UnixDomainSocketFactory {
  public:

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 
 set(CMAKE_CXX_STANDARD 14)
 
-set(MODULE_NAME server)
+set(MODULE_NAME thread_server)
 set(SOURCES
         main.cpp
     )
@@ -12,7 +12,8 @@ include_directories(${INC_PATH})
 add_executable(${MODULE_NAME} ${SOURCES})
 
 target_link_libraries(${MODULE_NAME}
-        EpollNamedPipe)
+        thread_named_pipe)
+
 
 set_property(TARGET ${MODULE_NAME} PROPERTY OUTPUT_NAME ${MODULE_NAME})
 

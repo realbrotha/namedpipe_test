@@ -4,6 +4,7 @@ set(MODULE_NAME UnixDomainSocket)
 
 set(SOURCES
         UnixDomainSocketFactory.h
+        UnixDomainSocketSessionManager.cpp
         UnixDomainSocketClient.cpp
         UnixDomainSocketServer.cpp
         UnixDomainSocketInterface.cpp
