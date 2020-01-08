@@ -102,13 +102,14 @@ void *UnixDomainSocketServer::EpollHandler(void *arg) {
     {
       std::cout << "EpollHandler::HandleMain: epoll count_: " << event_count << std::endl;
       for (int i = 0; i < event_count; ++i) {
-        printf("index [%d], event type [%d], from [%d]", i, gettingEvent[i].events, gettingEvent[i].data.fd);
+        printf("index [%d], event type [%d], from [%d]\n", i, gettingEvent[i].events, gettingEvent[i].data.fd);
         if (gettingEvent[i].data.fd == mgr->connection_checker_fd)    // 듣기 소켓에서 이벤트가 발생함
         {
           struct sockaddr_un client_addr;
           int client_socket = 0;
           socklen_t client_size = sizeof(client_addr);
-          client_socket = accept(mgr->connection_checker_fd, (struct sockaddr *) &client_addr, &client_size);
+
+          client_socket = accept(mgr->connection_checker_fd, reinterpret_cast<struct sockaddr *>(&client_addr), &client_size);
           if (client_socket > 0) {
             std::cout << "Socket Accept Called" << std::endl;
             UnixDomainSocketSessionManager::GetInstance().Add(client_socket, client_addr);
@@ -133,6 +134,7 @@ void *UnixDomainSocketServer::EpollHandler(void *arg) {
           client_event.data.fd = client_socket_fd;
 
           if (read_size < 0 || read_size == 0) { // Error or Disconnect
+            std::cout << "User Disconnect" << std::endl;
             epoll_ctl(mgr->epoll_fd_, EPOLL_CTL_DEL, client_socket_fd, &client_event);
             UnixDomainSocketSessionManager::GetInstance().Remove(client_socket_fd);
             continue;
@@ -141,7 +143,6 @@ void *UnixDomainSocketServer::EpollHandler(void *arg) {
           std::cout << "read Message : " << message << std::endl;
         }
       }
-      std::cout << "EpollHandler::HandleMain: epoll event " << std::endl;
     }
   }
   std::cout << "EpollHandler Thread!!!! END OF Thread" << std::endl;
