@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.5)
 set(MODULE_NAME UnixDomainSocket)
 
 set(SOURCES
+        SocketWrapper.cpp
         EpollWrapper.cpp
         UnixDomainSocketFactory.h
         UnixDomainSocketSessionManager.cpp
