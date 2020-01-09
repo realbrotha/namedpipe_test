@@ -25,7 +25,7 @@ class UnixDomainSocketClient {
 
   int epoll_fd_ = -1;
   int client_socket_fd_ = -1;
-  pthread_t epoll_thread_ = -1;
+
   struct sockaddr_un server_addr_ = {0, {0,}};
 
   std::atomic<bool> isEpollAdded_;

@@ -30,6 +30,15 @@ bool UnixDomainSocketSessionManager::Add(int &socket_fd, struct sockaddr_un &add
   return result;
 }
 
+std::map<int, struct sockaddr_un> UnixDomainSocketSessionManager::GetAll() {
+  std::map<int, struct sockaddr_un> buffer;
+
+  if (alive_client_session.size()) {
+    buffer = alive_client_session;
+  }
+  return buffer;
+}
+
 bool UnixDomainSocketSessionManager::Remove(int &socket_fd) {
   bool result = false;
 

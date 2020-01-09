@@ -4,19 +4,20 @@
 
 #include "UnixDomainSocketSessionManager.h"
 #include "UnixDomainSocketServer.h"
+#include "SocketWrapper.h"
+#include "EpollWrapper.h"
 #include "FileDescriptorTool.h"
 
 #include <iostream>
+#include <thread>
 
 #include <string.h>
 #include <unistd.h>
 
 #include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/epoll.h>
 
 namespace {
-constexpr char kFILE_SERVER[] = "/tmp/test_server";
+constexpr char kFILE_NAME[] = "/tmp/test_server";
 constexpr int kMAX_EVENT_COUNT = 3;
 }
 UnixDomainSocketServer::UnixDomainSocketServer() {
@@ -29,53 +30,50 @@ UnixDomainSocketServer::~UnixDomainSocketServer() {
 bool UnixDomainSocketServer::Initialize() {
   std::cout << "Server Side Init";
 
-  if (0 == access(kFILE_SERVER, F_OK))
-    unlink(kFILE_SERVER);
+  if (0 == access(kFILE_NAME, F_OK))
+    unlink(kFILE_NAME);
 
-  connection_checker_fd = socket(PF_FILE, SOCK_STREAM, 0);
-
-  if (-1 == connection_checker_fd) {
-    printf("create socket failed\n");
-  }
-  struct sockaddr_un server_addr;
-
-  memset(&server_addr, 0, sizeof(server_addr));
-  server_addr.sun_family = AF_UNIX;
-  strcpy(server_addr.sun_path, kFILE_SERVER);
-
-  if (-1 == bind(connection_checker_fd, (struct sockaddr *) &server_addr, sizeof(server_addr))) {
-    printf("bind failed\n");
-  }
-
-  if (-1 == listen(connection_checker_fd, 5 /*back log size ??? 정확히 알아 볼것 */)) {
-    printf("listen failed\n");
-  }
-
-  int epoll_fd = epoll_create(1);
-  if (epoll_fd < 0) {
-    std::cout << "epoll create failed";
+  if (!SocketWrapper::Create(accept_checker_fd_)) {
+    std::cout << "Socket Create Failed" << std::endl;
     return false;
   }
-  FileDescriptorTool::SetCloseOnExec(epoll_fd, true);
-  FileDescriptorTool::SetNonBlock(epoll_fd, true);
 
-  epoll_fd_ = epoll_fd;
+  memset(&server_addr_, 0, sizeof(server_addr_));
+  server_addr_.sun_family = AF_UNIX;
+  strcpy(server_addr_.sun_path, kFILE_NAME);
 
-  epoll_event settingEvent = {0, {0}};
-  settingEvent.data.fd = connection_checker_fd;
-  settingEvent.events = EPOLLIN | EPOLLOUT | EPOLLERR;
-
-  if (-1 == epoll_ctl(epoll_fd, EPOLL_CTL_ADD, connection_checker_fd, &settingEvent)) {
-    std::cout << "NamedPipeManager::HandleMain: epoll_ctl failed" << std::endl;
+  if (!SocketWrapper::Bind(accept_checker_fd_, server_addr_)) {
+    std::cout << "Socket Bind Failed" << std::endl;
     return false;
   }
-  pthread_create(&check_thread, NULL, EpollHandler, this);
+  if (!SocketWrapper::Listen(accept_checker_fd_, 5)) {
+    std::cout << "Socket Listen Failed" << std::endl;
+    return false;
+  }
+
+  if (!EpollWrapper::EpollCreate(1, true, epoll_fd_)) {
+    std::cout << "Epoll Create Failed" << std::endl;
+    return false;
+  }
+
+  if (!EpollWrapper::EpollControll(epoll_fd_,
+                                   accept_checker_fd_,
+                                   EPOLLIN | EPOLLOUT | EPOLLERR,
+                                   EPOLL_CTL_ADD)) {
+    std::cout << "epoll add failed" << std::endl;
+    return false;
+  }
+
+  std::thread server_socket_thread(&UnixDomainSocketServer::EpollHandler, this);
+  server_socket_thread.detach();
+  return true;
 }
 
 bool UnixDomainSocketServer::Finalize() {
-  printf("Finalilze!!!!\n");
   stopped_ = true;
-  pthread_join(check_thread, NULL);
+
+  close(accept_checker_fd_);
+  close(epoll_fd_);
 }
 
 void *UnixDomainSocketServer::EpollHandler(void *arg) {
@@ -83,68 +81,89 @@ void *UnixDomainSocketServer::EpollHandler(void *arg) {
   UnixDomainSocketServer *mgr = reinterpret_cast<UnixDomainSocketServer *>(arg);
   mgr->stopped_ = false;
 
+  int errorCount = 0;
+
   while (!mgr->stopped_) {
     epoll_event gettingEvent[kMAX_EVENT_COUNT] = {0, {0}};
     int event_count = epoll_wait(mgr->epoll_fd_, gettingEvent, kMAX_EVENT_COUNT, 10 /* ms */);
-    int errorCount = 0;
 
-    if (event_count < 0) // error
+    if (event_count > 0) // 이벤트 떨어짐.  event_count = 0 처리안함.
     {
-      if (errno == EINTR) {
-        continue;
-      }
-      if (++errorCount < 3) {
-        std::cout << "Epoll Error++" << std::endl;
-        continue;
-      }
-      break;
-    } else if (event_count > 0) // 이벤트 떨어짐.  event_count = 0 처리안함.
-    {
-      std::cout << "EpollHandler::HandleMain: epoll count_: " << event_count << std::endl;
       for (int i = 0; i < event_count; ++i) {
-        printf("index [%d], event type [%d], from [%d]\n", i, gettingEvent[i].events, gettingEvent[i].data.fd);
-        if (gettingEvent[i].data.fd == mgr->connection_checker_fd)    // 듣기 소켓에서 이벤트가 발생함
+        printf("epoll event index [%d], event type [%d], from [%d]\n",
+               i,
+               gettingEvent[i].events,
+               gettingEvent[i].data.fd);
+        if (gettingEvent[i].data.fd == mgr->accept_checker_fd_)    // accept
         {
           struct sockaddr_un client_addr;
           int client_socket = 0;
-          socklen_t client_size = sizeof(client_addr);
 
-          client_socket = accept(mgr->connection_checker_fd, reinterpret_cast<struct sockaddr *>(&client_addr), &client_size);
-          if (client_socket > 0) {
+          if (!SocketWrapper::Accept(client_socket, mgr->accept_checker_fd_, client_addr)) {
+            std::cout << "Socket Accept Failed" << std::endl;
+            continue;
+          } else { //  accept 성공시
             std::cout << "Socket Accept Called" << std::endl;
             UnixDomainSocketSessionManager::GetInstance().Add(client_socket, client_addr);
 
-            struct epoll_event client_event;
-            client_event.events = EPOLLIN;
-            client_event.data.fd = client_socket;;
-            if (-1 == epoll_ctl(mgr->epoll_fd_, EPOLL_CTL_ADD, client_socket, &client_event)) {
-              std::cout << "NamedPipeManager::HandleMain: epoll_ctl" << std::endl;
+            if (!EpollWrapper::EpollControll(mgr->epoll_fd_,
+                                             client_socket,
+                                             EPOLLIN | EPOLLOUT | EPOLLERR,
+                                             EPOLL_CTL_ADD)) {
+              std::cout << "epoll add failed" << std::endl;
               continue;
             }
           }
-        } else  // accept 이후
-        {
-          int client_socket_fd = gettingEvent[i].data.fd;
-
+        } else { // accept 이후
+          int client_fd = gettingEvent[i].data.fd;
           char message[1024] = {0,};
-          int read_size = read(client_socket_fd, message, sizeof(message));
-
-          struct epoll_event client_event;
-          client_event.events = EPOLLIN;
-          client_event.data.fd = client_socket_fd;
+          int read_size = read(gettingEvent[i].data.fd, message, sizeof(message));
 
           if (read_size < 0 || read_size == 0) { // Error or Disconnect
             std::cout << "User Disconnect" << std::endl;
-            epoll_ctl(mgr->epoll_fd_, EPOLL_CTL_DEL, client_socket_fd, &client_event);
-            UnixDomainSocketSessionManager::GetInstance().Remove(client_socket_fd);
+
+            EpollWrapper::EpollControll(mgr->epoll_fd_,
+                                        client_fd,
+                                        EPOLLIN | EPOLLOUT | EPOLLERR,
+                                        EPOLL_CTL_DEL);
+            UnixDomainSocketSessionManager::GetInstance().Remove(client_fd);
             continue;
           }
           std::string buff(message);
           std::cout << "read Message : " << message << std::endl;
         }
       }
+    } else if (event_count < 0) // epoll error
+    {
+      if (errno == EINTR) {
+        continue;
+      }
+      if (++errorCount < 3) {
+        if (!(EpollWrapper::EpollCreate(1, true, mgr->epoll_fd_) &&
+            EpollWrapper::EpollControll(mgr->epoll_fd_,
+                                        mgr->accept_checker_fd_,
+                                        EPOLLIN | EPOLLOUT | EPOLLERR,
+                                        EPOLL_CTL_ADD))) {
+          std::cout << "epoll add failed" << std::endl;
+          break; // 한번해보고 실패시 종료.
+        }
+        continue;
+      }
+      break; // 에러가 많으면 종료
     }
   }
   std::cout << "EpollHandler Thread!!!! END OF Thread" << std::endl;
-  pthread_exit(NULL);
+}
+
+bool UnixDomainSocketServer::SendMessageBroadcast(std::string &send_string) {
+  bool result = false;
+  std::map<int, struct sockaddr_un> buffer = UnixDomainSocketSessionManager::GetInstance().GetAll();
+  if (buffer.size()) {
+    std::cout << "server send string : " << send_string << std::endl;
+    for (auto it = buffer.begin(); it != buffer.end(); it++) {
+      write(it->first, send_string.c_str(), send_string.length() + 1);
+    }
+    result = true;
+  }
+  return result;
 }

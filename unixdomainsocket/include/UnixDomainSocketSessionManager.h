@@ -16,6 +16,7 @@ class UnixDomainSocketSessionManager {
   ~UnixDomainSocketSessionManager();
 
   bool Add(int &socket_fd, struct sockaddr_un &addr);
+  std::map<int, struct sockaddr_un> GetAll();
   bool Remove(int &socket_fd);
   bool RemoveAll();
 

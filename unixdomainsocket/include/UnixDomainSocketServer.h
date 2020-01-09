@@ -7,8 +7,11 @@
 
 #include "UnixDomainSocketFactory.h"
 
+#include <string>
 #include <atomic>
+
 #include <pthread.h>
+#include <sys/un.h>
 
 class UnixDomainSocketServer : public UnixDomainSocketFactory {
  public :
@@ -18,12 +21,15 @@ class UnixDomainSocketServer : public UnixDomainSocketFactory {
   virtual bool Initialize();
   virtual bool Finalize();
 
-  static void *EpollHandler(void *arg);
+  virtual bool SendMessageBroadcast(std::string &send_string);
 
  private :
+  static void *EpollHandler(void *arg);
+
   int epoll_fd_ = 0;
-  int connection_checker_fd = 0;
-  pthread_t check_thread = 0;
+  int accept_checker_fd_ = 0;
+
+  struct sockaddr_un server_addr_ = {0, {0,}};
   std::atomic<bool> stopped_;
 };
 

@@ -63,6 +63,7 @@ void *UnixDomainSocketClient::MainHandler(void *arg) {
 
   while (!mgr->stopped_) {
     bool restart_flag = false;
+
     if (0 > mgr->client_socket_fd_) { // socket을 생성하고 connection 시킴
       if (!SocketWrapper::Create(mgr->client_socket_fd_)) {
         mgr->isConnected_ = true;
@@ -73,8 +74,9 @@ void *UnixDomainSocketClient::MainHandler(void *arg) {
         continue;
       }
     }
+
     if (!mgr->isConnected_) { // socket을 생성하고 connection 시킴
-      if ( SocketWrapper::Connect(mgr->client_socket_fd_, mgr->server_addr_)) {
+      if (SocketWrapper::Connect(mgr->client_socket_fd_, mgr->server_addr_)) {
         mgr->isConnected_ = true;
         std::cout << "Socket Connect OK" << std::endl;
       } else {
@@ -97,15 +99,13 @@ void *UnixDomainSocketClient::MainHandler(void *arg) {
         continue;
       }
     }
-    //if (mgr->isEpollAdded_) {}
     // 정상적으로 처리 될경우
     epoll_event gettingEvent[kMAX_EVENT_COUNT] = {0, {0}};
     int event_count = epoll_wait(mgr->epoll_fd_, gettingEvent, kMAX_EVENT_COUNT, 10 /* ms */);
 
     if (event_count > 0) { // 이벤트 발생, event_count = 0 처리안함.
-      std::cout << "EpollHandler::HandleMain: epoll count_: " << event_count << std::endl;
       for (int i = 0; i < event_count; ++i) {
-        printf("index [%d], event type [%d], from [%d]\n", i, gettingEvent[i].events, gettingEvent[i].data.fd);
+        printf("event count [%d], event type [%d], from [%d]\n", i, gettingEvent[i].events, gettingEvent[i].data.fd);
         if (gettingEvent[i].data.fd == mgr->client_socket_fd_)    // 듣기 소켓에서 이벤트가 발생함
         {
           char message[1024] = {0,};
@@ -128,10 +128,8 @@ void *UnixDomainSocketClient::MainHandler(void *arg) {
                                   EPOLLIN | EPOLLOUT | EPOLLERR,
                                   EPOLL_CTL_DEL);
       close(mgr->client_socket_fd_);
-      //close(mgr->epoll_fd_);
 
       mgr->client_socket_fd_ = -1;
-      //mgr->epoll_fd_ = -1;
       mgr->isEpollAdded_ = false;
       mgr->isConnected_ = false;
       continue;
