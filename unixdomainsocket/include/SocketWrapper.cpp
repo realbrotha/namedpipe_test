@@ -3,17 +3,19 @@
 //
 
 #include "SocketWrapper.h"
+#include "FileDescriptorTool.h"
 
 #include <sys/un.h>
 #include <sys/socket.h>
 #include <iostream>
 
-bool SocketWrapper::Create(int &socket_fd) {
+bool SocketWrapper::Create(int &socket_fd, bool non_block_mode) {
   socket_fd = socket(PF_FILE, SOCK_STREAM, 0);
   if (-1 == socket_fd) {
     std::cout << "create socket failed" << std::endl;
     return false;
   }
+  FileDescriptorTool::SetNonBlock(socket_fd, non_block_mode);
   std::cout << "create socket success" << std::endl;
   return true;
 }

@@ -7,7 +7,7 @@
 
 class SocketWrapper {
  public:
-  static bool Create(int &socket_fd);
+  static bool Create(int &socket_fd, bool non_block_mode = false);
   static bool Connect(int &socket_fd, struct sockaddr_un &sock_addr);
   static bool Bind(int &socket_fd, struct sockaddr_un &sock_addr);
   static bool Listen(int &socket_fd, int backlog_size);

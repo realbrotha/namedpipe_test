@@ -14,7 +14,7 @@
 #include <unistd.h>
 
 #include <sys/epoll.h>
-
+#include <sys/ioctl.h>
 namespace {
 constexpr char kFILE_NAME[] = "/tmp/test_server";
 constexpr int kMAX_EVENT_COUNT = 3;
@@ -117,7 +117,16 @@ void *UnixDomainSocketClient::MainHandler(void *arg) {
             break;
           }
           std::string buff(message);
-          std::cout << "client read Message : " << message << std::endl;
+
+          do  // read more
+          {
+            std::cout << "read more!!!!! ";
+            //buff += message;
+            memset (message, 0x00, sizeof (message));
+            read_size = read(mgr->client_socket_fd_, message, sizeof(message));
+          } while (read_size > 0);
+
+          std::cout << "client read Message : " << buff << std::endl;
         }
       }
     }
@@ -142,7 +151,7 @@ void *UnixDomainSocketClient::MainHandler(void *arg) {
 bool UnixDomainSocketClient::SendMessage(std::string &send_string) {
   bool result = false;
   if (0 < client_socket_fd_) {
-    std::cout << "send string : " << send_string << std::endl;
+    //std::cout << "send string : " << send_string << std::endl;
     write(client_socket_fd_, send_string.c_str(), send_string.length() + 1);
     result = true;
   }
