@@ -6,24 +6,27 @@
 #define TESTEPOLLPIPE_UNIXDOMAINSOCKET_INCLUDE_UNIXDOMAINSOCKETSESSIONMANAGER_H_
 
 #include "mutex.hpp"
+#include "Message.h"
 
 #include <map>
 
 class UnixDomainSocketSessionManager {
-  // TODO : 사실 서버프로그램이 아니라 IPC 용이므로 이러한 메니저가 존재할 이유가 없다. 아무이유 없이 만들었음.
  public :
   static UnixDomainSocketSessionManager &GetInstance();
   ~UnixDomainSocketSessionManager();
 
-  bool Add(int &socket_fd, struct sockaddr_un &addr);
-  std::map<int, struct sockaddr_un> GetAll();
+  bool Add(int &product_code, int &socket_fd);
   bool Remove(int &socket_fd);
+
+  std::map<int, int> GetAllSession();
   bool RemoveAll();
 
+  MessageManager &GetMessageManager();
  private:
   mutex mutex_;
+  MessageManager message_manager_;
 
-  std::map<int, struct sockaddr_un> alive_client_session;
+  std::map<int, int /*product, socket_fd*/> socket_list_;
 };
 
 #endif //TESTEPOLLPIPE_UNIXDOMAINSOCKET_INCLUDE_UNIXDOMAINSOCKETSESSIONMANAGER_H_

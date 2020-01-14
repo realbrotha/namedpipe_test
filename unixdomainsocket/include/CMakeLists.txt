@@ -6,6 +6,7 @@ set(SOURCES
         SocketWrapper.cpp
         EpollWrapper.cpp
         UnixDomainSocketFactory.h
+        Message.cpp
         UnixDomainSocketSessionManager.cpp
         UnixDomainSocketClient.cpp
         UnixDomainSocketServer.cpp

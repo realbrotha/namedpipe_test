@@ -16,13 +16,14 @@ class UnixDomainSocketClient {
   UnixDomainSocketClient();
   virtual ~UnixDomainSocketClient();
 
-  virtual bool Initialize();
+  virtual bool Initialize(int& product_code);
   virtual bool Finalize();
   virtual bool SendMessage(std::string &send_string);
 
  private :
   static void *MainHandler(void *arg);
 
+  int product_code_ = -1;
   int epoll_fd_ = -1;
   int client_socket_fd_ = -1;
 

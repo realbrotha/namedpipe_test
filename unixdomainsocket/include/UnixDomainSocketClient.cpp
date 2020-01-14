@@ -6,6 +6,7 @@
 #include "FileDescriptorTool.h"
 #include "EpollWrapper.h"
 #include "SocketWrapper.h"
+#include "Message.h"
 
 #include <iostream>
 #include <chrono>
@@ -27,7 +28,9 @@ UnixDomainSocketClient::~UnixDomainSocketClient() {
   Finalize();
 }
 
-bool UnixDomainSocketClient::Initialize() {
+bool UnixDomainSocketClient::Initialize(int& product_code) {
+  product_code_ = product_code;
+
   memset(&server_addr_, 0, sizeof(server_addr_));
   server_addr_.sun_family = AF_UNIX;
   strcpy(server_addr_.sun_path, kFILE_NAME);
@@ -78,6 +81,11 @@ void *UnixDomainSocketClient::MainHandler(void *arg) {
     if (!mgr->isConnected_) { // socket을 생성하고 connection 시킴
       if (SocketWrapper::Connect(mgr->client_socket_fd_, mgr->server_addr_)) {
         mgr->isConnected_ = true;
+
+        char buffer[10] = {0,};
+        sprintf(buffer, "product:%d", mgr->product_code_);
+
+        write(mgr->client_socket_fd_, buffer, sizeof(buffer));
         std::cout << "Socket Connect OK" << std::endl;
       } else {
         std::cout << "Socket Connect Failed" << std::endl;
@@ -151,8 +159,12 @@ void *UnixDomainSocketClient::MainHandler(void *arg) {
 bool UnixDomainSocketClient::SendMessage(std::string &send_string) {
   bool result = false;
   if (0 < client_socket_fd_) {
-    //std::cout << "send string : " << send_string << std::endl;
-    write(client_socket_fd_, send_string.c_str(), send_string.length() + 1);
+    //std::cout << "!!!send string : " << send_string << std::endl;
+    Message send_msg(send_string.c_str(), send_string.length(), 1, 1);
+    //std::cout << "@@@send String : " << &send_msg.GetRawData()[0];
+    std::cout << " send Length : " << send_msg.GetRawData().size() << std::endl;
+    write(client_socket_fd_, &send_msg.GetRawData()[0], send_msg.GetRawData().size());
+
     result = true;
   }
   return result;

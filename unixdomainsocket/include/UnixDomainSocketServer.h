@@ -13,6 +13,11 @@
 #include <pthread.h>
 #include <sys/un.h>
 
+struct UserEpoll{
+  int product_code;
+  int target_td;
+};
+
 class UnixDomainSocketServer : public UnixDomainSocketFactory {
  public :
   UnixDomainSocketServer();
@@ -31,6 +36,8 @@ class UnixDomainSocketServer : public UnixDomainSocketFactory {
 
   struct sockaddr_un server_addr_ = {0, {0,}};
   std::atomic<bool> stopped_;
+
+  struct UserEpoll struct_user_epoll_;
 };
 
 #endif //TESTEPOLLPIPE_UNIXDOMAINSOCKET_INCLUDE_UNIXDOMAINSOCKETSERVER_H_

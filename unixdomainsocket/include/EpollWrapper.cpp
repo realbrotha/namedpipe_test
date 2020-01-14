@@ -20,10 +20,15 @@ bool EpollWrapper::EpollCreate(int epoll_size, bool blocking_mode, int &out_epol
   }
   return result;
 }
-bool EpollWrapper::EpollControll(int &epoll_fd, int target_fd, uint32_t epoll_event_type, int mode) {
-  std::cout << "EpollControl!!!!!!!!!!!" << std::endl;
+bool EpollWrapper::EpollControll(int &epoll_fd, int target_fd, uint32_t epoll_event_type, int mode, void* data_struct) {
   struct epoll_event settingEvent = {0, {0}};
-  settingEvent.data.fd = target_fd;
+
+  if (data_struct){
+    printf ("Epoll Controll!!!! struct");
+    settingEvent.data.ptr = data_struct; //pointer ;
+  } else {
+    settingEvent.data.fd = target_fd;
+  }
   settingEvent.events = epoll_event_type;
 
   return (-1 != epoll_ctl(epoll_fd, mode, target_fd, &settingEvent)) ? true : false;

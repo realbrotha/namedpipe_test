@@ -11,30 +11,33 @@ UnixDomainSocketSessionManager &UnixDomainSocketSessionManager::GetInstance() {
   static UnixDomainSocketSessionManager instance_;
   return instance_;
 }
+
 UnixDomainSocketSessionManager::~UnixDomainSocketSessionManager() {
   // todo : do somthing
   lock_guard<mutex> lock(mutex_);
   RemoveAll();
 }
 
-bool UnixDomainSocketSessionManager::Add(int &socket_fd, struct sockaddr_un &addr) {
+bool UnixDomainSocketSessionManager::Add(int& product_code, int &socket_fd) {
   bool result = false;
-
-  if (alive_client_session.count(socket_fd)) {
+  if (socket_list_.count(product_code)) {
     std::cout << "already exist";
   } else {
     lock_guard<mutex> lock(mutex_);
-    alive_client_session[socket_fd] = addr;
+    socket_list_[product_code] = socket_fd;
     result = true;
   }
   return result;
 }
 
-std::map<int, struct sockaddr_un> UnixDomainSocketSessionManager::GetAll() {
-  std::map<int, struct sockaddr_un> buffer;
+MessageManager &UnixDomainSocketSessionManager::GetMessageManager() {
+  return message_manager_;
+}
 
-  if (alive_client_session.size()) {
-    buffer = alive_client_session;
+std::map<int, int> UnixDomainSocketSessionManager::GetAllSession() {
+  std::map<int, int> buffer;
+  if (!socket_list_.empty()) {
+    buffer = socket_list_;
   }
   return buffer;
 }
@@ -42,14 +45,15 @@ std::map<int, struct sockaddr_un> UnixDomainSocketSessionManager::GetAll() {
 bool UnixDomainSocketSessionManager::Remove(int &socket_fd) {
   bool result = false;
 
-  if (alive_client_session.count(socket_fd)) {
+  if (socket_list_.count(socket_fd)) {
     lock_guard<mutex> lock(mutex_);
-    alive_client_session.erase(socket_fd);
+    socket_list_.erase(socket_fd);
     result = true;
   }
   return result;
 }
+
 bool UnixDomainSocketSessionManager::RemoveAll() {
-  alive_client_session.clear();
+  socket_list_.clear();
 }
 
