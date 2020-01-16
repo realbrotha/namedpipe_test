@@ -9,7 +9,7 @@ int main(int argc, char *argv[]) {
   UnixDomainSocketClient *client;
 
   std::string buffer3;
-  for (int i = 0; i < 1000 * 1000 * 10; ++i) {
+  for (int i = 0; i < 1000 *100; ++i) {
     buffer3 += "abcde12345";
   }
   printf ("last key [%c] [%c] [%c]\n", buffer3[buffer3.size()], buffer3[buffer3.size() -1], buffer3[buffer3.size()-2]);

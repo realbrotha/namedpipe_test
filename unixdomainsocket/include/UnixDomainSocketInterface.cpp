@@ -32,7 +32,6 @@ bool UnixDomainSocketInterface::GetInterfaceObject(unsigned int type, UnixDomain
       UnixDomainSocketClient *client_object = nullptr;
       client_object = new UnixDomainSocketClient;
       if (client_object) {
-        std::cout << " clien get";
         interface_object = reinterpret_cast<UnixDomainSocketInterface *>(client_object);
         result = true;
       }

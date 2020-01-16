@@ -19,16 +19,22 @@
 namespace {
 constexpr char kFILE_NAME[] = "/tmp/test_server";
 constexpr int kMAX_EVENT_COUNT = 3;
+constexpr int kMAX_READ_SIZE = 2048;
 }
 
-UnixDomainSocketClient::UnixDomainSocketClient() {
+UnixDomainSocketClient::UnixDomainSocketClient() : stopped_(false),
+                                                   isConnected_(false),
+                                                   isEpollAdded_(false),
+                                                   product_code_(-1),
+                                                   epoll_fd_(-1),
+                                                   client_socket_fd_(-1) {
 }
 
 UnixDomainSocketClient::~UnixDomainSocketClient() {
   Finalize();
 }
 
-bool UnixDomainSocketClient::Initialize(int& product_code) {
+bool UnixDomainSocketClient::Initialize(int &product_code) {
   product_code_ = product_code;
 
   memset(&server_addr_, 0, sizeof(server_addr_));
@@ -60,16 +66,16 @@ bool UnixDomainSocketClient::Finalize() {
 void *UnixDomainSocketClient::MainHandler(void *arg) {
   std::cout << "Client EpollHandler Thread!!!!" << std::endl;
   UnixDomainSocketClient *mgr = reinterpret_cast<UnixDomainSocketClient *>(arg);
-  mgr->stopped_ = false;
-  mgr->isConnected_ = false;
-  mgr->isEpollAdded_ = false;
+
+  MessageManager message_manager;
 
   while (!mgr->stopped_) {
     bool restart_flag = false;
 
     if (0 > mgr->client_socket_fd_) { // socket을 생성하고 connection 시킴
-      if (!SocketWrapper::Create(mgr->client_socket_fd_)) {
+      if (SocketWrapper::Create(mgr->client_socket_fd_)) {
         mgr->isConnected_ = true;
+
         std::cout << "Socket Connect OK" << std::endl;
       } else {
         std::cout << "Socket Create Failed" << std::endl;
@@ -81,7 +87,7 @@ void *UnixDomainSocketClient::MainHandler(void *arg) {
     if (!mgr->isConnected_) { // socket을 생성하고 connection 시킴
       if (SocketWrapper::Connect(mgr->client_socket_fd_, mgr->server_addr_)) {
         mgr->isConnected_ = true;
-
+        FileDescriptorTool::SetNonBlock(mgr->client_socket_fd_, true);
         char buffer[10] = {0,};
         sprintf(buffer, "product:%d", mgr->product_code_);
 
@@ -97,7 +103,7 @@ void *UnixDomainSocketClient::MainHandler(void *arg) {
       std::cout << "EPOLL VALUE : " << mgr->epoll_fd_ << "Remake!!" << std::endl;
       if (EpollWrapper::EpollControll(mgr->epoll_fd_,
                                       mgr->client_socket_fd_,
-                                      EPOLLIN | EPOLLOUT | EPOLLERR,
+                                      EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLET,
                                       EPOLL_CTL_ADD)) {
         std::cout << "~~~~~epoll controll success~~~~~~~" << std::endl;
         mgr->isEpollAdded_ = true;
@@ -113,28 +119,54 @@ void *UnixDomainSocketClient::MainHandler(void *arg) {
 
     if (event_count > 0) { // 이벤트 발생, event_count = 0 처리안함.
       for (int i = 0; i < event_count; ++i) {
-        printf("event count [%d], event type [%d], from [%d]\n", i, gettingEvent[i].events, gettingEvent[i].data.fd);
+        //printf("event count [%d], event type [%d], from [%d]\n", i, gettingEvent[i].events, gettingEvent[i].data.fd);
         if (gettingEvent[i].data.fd == mgr->client_socket_fd_)    // 듣기 소켓에서 이벤트가 발생함
         {
-          char message[1024] = {0,};
-          int read_size = read(mgr->client_socket_fd_, message, sizeof(message));
-
-          if (read_size < 0 || read_size == 0) { // Error or Disconnect
+          int client_fd = mgr->client_socket_fd_;
+          char message[kMAX_READ_SIZE] = {0,};
+          int read_size = read(client_fd, message, sizeof(message));
+          if ( read_size < 0) { // continue
+            continue;
+          }
+          if ( read_size == 0) { // Error or Disconnect
             std::cout << "Disconnect Event !!!!!!!!!" << std::endl;
             restart_flag = true;
             break;
           }
-          std::string buff(message);
-
+          // 정상
+          printf("Message Recv!!!!!!! read size :%d\n", read_size);
+          Message msg(reinterpret_cast<const uint8_t *>(message), read_size); // 메세지 제작
+          char read_more[kMAX_READ_SIZE] = {0,};
+          int read_more_size = 0;
           do  // read more
           {
-            std::cout << "read more!!!!! ";
-            //buff += message;
-            memset (message, 0x00, sizeof (message));
-            read_size = read(mgr->client_socket_fd_, message, sizeof(message));
-          } while (read_size > 0);
+            memset(read_more, 0x00, sizeof(read_more));
+            read_more_size = read(client_fd, read_more, sizeof(read_more));
+            if (read_more_size > 0) {
+              msg.AppendData(read_more, read_more_size); // 메세지 제작
+            }
+          } while (read_more_size > 0);
+          int32_t server_code = 0x00;
 
-          std::cout << "client read Message : " << buff << std::endl;
+          MessageParser parser(msg);
+          if (parser.IsHeader()) { // header 정보가 있을경우
+            message_manager.Add(server_code, msg);
+          } else {  // communicated product type
+            if (message_manager.IsExistMessage(server_code)) {
+              Message msg_need_append = message_manager.MessagePop(server_code);
+              msg_need_append.AppendData(reinterpret_cast<char *>(&msg.GetRawData()[0]), msg.GetMessageSize());
+              message_manager.Add(server_code, msg_need_append);
+            }
+          }
+
+          if (message_manager.IsPerfectMessage(server_code)) {
+            Message msg_complete = message_manager.MessagePop(server_code);
+            MessageParser msg_parser(msg_complete);
+            printf("*****msg size1 : [%d]*****\n", msg_complete.GetMessageSize());
+            printf("*****msg size2 : [%d]*****\n", msg_parser.GetDataSize());
+            printf("*****Message Done*****\n");
+          }
+
         }
       }
     }
@@ -142,7 +174,7 @@ void *UnixDomainSocketClient::MainHandler(void *arg) {
       std::cout << "***********Error BREAK Restart!!!!" << std::endl;
       EpollWrapper::EpollControll(mgr->epoll_fd_,
                                   mgr->client_socket_fd_,
-                                  EPOLLIN | EPOLLOUT | EPOLLERR,
+                                  EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLET,
                                   EPOLL_CTL_DEL);
       close(mgr->client_socket_fd_);
 
@@ -159,12 +191,20 @@ void *UnixDomainSocketClient::MainHandler(void *arg) {
 bool UnixDomainSocketClient::SendMessage(std::string &send_string) {
   bool result = false;
   if (0 < client_socket_fd_) {
-    //std::cout << "!!!send string : " << send_string << std::endl;
     Message send_msg(send_string.c_str(), send_string.length(), 1, 1);
-    //std::cout << "@@@send String : " << &send_msg.GetRawData()[0];
     std::cout << " send Length : " << send_msg.GetRawData().size() << std::endl;
-    write(client_socket_fd_, &send_msg.GetRawData()[0], send_msg.GetRawData().size());
+    ssize_t data_size = send_msg.GetRawData().size();
+    int next_post = 0;
+    while (next_post < data_size) {
+      size_t write_result_size = write(client_socket_fd_, &send_msg.GetRawData()[next_post], data_size - next_post);
+      next_post += write_result_size;
+      if (0 < write_result_size) {
+        usleep(100);
+        continue;
+      } else if (write_result_size < send_msg.GetRawData().size()) {
 
+      }
+    }
     result = true;
   }
   return result;

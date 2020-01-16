@@ -58,6 +58,9 @@ const uint8_t *MessageParser::GetData() {
 bool MessageParser::IsHeader() {
   return (message_header_.header_checker == 0x98765432) ? true : false;
 }
+int32_t MessageParser::GetHeaderSize() const{
+  return sizeof(message_header_);
+}
 int32_t MessageParser::GetDataSize() const{
   return data_length;
 }
@@ -78,6 +81,9 @@ int16_t MessageParser::GetPriority() const {
 }
 int16_t MessageParser::GetRequestTimeOut() const {
   return message_header_.request_timeout;
+}
+Message::Message() {
+
 }
 Message::Message(const char *data,
                  int32_t data_length,
@@ -102,7 +108,7 @@ Message::Message(const uint8_t *buff, const size_t message_size) {
   message_.resize(message_size);
   message_size_ = message_size;
 
-  MessageHeader *h = reinterpret_cast<MessageHeader *>(&message_[0]);
+  //MessageHeader *h = reinterpret_cast<MessageHeader *>(&message_[0]);
   memcpy(reinterpret_cast<void *>(&message_[0]), buff, message_size);
 }
 Message::~Message() {
@@ -113,15 +119,21 @@ std::vector<uint8_t> &Message::GetRawData() {
 }
 
 void Message::AppendData(const char *data, int32_t data_size) {
-  size_t message_size_buffer = message_size_;
-  size_t needed_size = message_size_buffer + data_size;
-  if (message_.capacity() < needed_size) {
-    message_.resize(needed_size);
-    message_size_ = needed_size;
-  }
-  memcpy(reinterpret_cast<void *>(&message_[message_size_buffer]), data, data_size);
-}
+  size_t message_size_buffer = message_size_ ; // null
+  size_t needed_size = message_size_buffer + data_size ; // null
 
+  if (message_.size() < needed_size) {
+    message_.resize(needed_size );
+  }
+  message_size_ = needed_size ;
+  //constexpr char nullchar = '\0';
+  memcpy(reinterpret_cast<void *>(&message_[message_size_buffer]), data, data_size);
+  //memcpy(reinterpret_cast<void *>(&message_[needed_size]), &nullchar, 1);
+
+}
+int32_t Message::GetMessageSize() const{
+  return message_size_;
+}
 void Message::SetHeader(int32_t message_length,
                         int16_t listener_type,
                         int32_t message_id,
@@ -146,32 +158,37 @@ void Message::SetBody(const char *data, const int size) { // SetHeader Dependenc
   memcpy(reinterpret_cast<void *>(&h_[1]), data, size);
 }
 
-bool MessageManager::Add(int32_t product_type, Message msg, int32_t message_id) {
-  if (!product_type || !message_id)
+bool MessageManager::Add(int32_t& product_type, Message& msg) {
+  if (0 > product_type)
     return false;
 
-  if (message_map_.count(product_type) &&
-      message_map_[product_type].count(message_id)) { // 메세지가 있다면..
-    return false;
-  } else {
-    std::map<int32_t, Message> msg_buffer;
-    message_map_[product_type] = msg_buffer;
-  }
-
+  message_map_[product_type] = msg;
   return true;
 }
-bool MessageManager::Remove(int32_t product_type, Message msg, int32_t message_id) {
-  if (message_map_.count(product_type) &&
-      message_map_[product_type].count(message_id)) {
-    message_map_[product_type].erase(message_id);
+bool MessageManager::Remove(int32_t& product_type) {
+  if (message_map_.count(product_type)) {
+    message_map_.erase(product_type);
     return true;
   }
   return false;
 }
-bool MessageManager::IsPerfectMessage(int32_t product_type, int32_t message_id) {
-  if (message_map_.count(product_type) &&
-      message_map_[product_type].count(message_id)) {
-    //MessageParser message_parser(message_map_[product_type][message_id]);
-    //message_parser.
+bool MessageManager::IsPerfectMessage(int32_t& product_type) {
+  if (message_map_.count(product_type)) {
+    MessageParser message_parser(message_map_[product_type]);
+    if (message_parser.GetMessageFullSize() == message_map_[product_type].GetMessageSize())
+      return true;
   }
+  return false;
+}
+bool MessageManager::IsExistMessage(int32_t& product_type){
+  return (message_map_.count(product_type)) ? true : false;
+}
+
+Message MessageManager::MessagePop(int32_t& product_type) {
+  Message message_buffer;
+  if (message_map_.count(product_type)) {
+    message_buffer = message_map_[product_type];
+    message_map_.erase(product_type);
+  }
+  return message_buffer;
 }

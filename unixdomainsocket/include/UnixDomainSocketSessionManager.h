@@ -16,17 +16,19 @@ class UnixDomainSocketSessionManager {
   ~UnixDomainSocketSessionManager();
 
   bool Add(int &product_code, int &socket_fd);
-  bool Remove(int &socket_fd);
-
-  std::map<int, int> GetAllSession();
+  bool Remove(int &product_code);
   bool RemoveAll();
 
-  MessageManager &GetMessageManager();
+  bool GetProductCode(int &product_code, int &socket_fd);
+  bool GetSocketFd(int &product_code, int &socket_fd);
+  bool GetSocketFdAll(std::map<int, int>& socket_list);
+  int32_t GetSocketFdSize();
  private:
   mutex mutex_;
-  MessageManager message_manager_;
 
+  std::map<int, int /*socket_fd, product*/> reverse_socket_list_;
   std::map<int, int /*product, socket_fd*/> socket_list_;
 };
 
 #endif //TESTEPOLLPIPE_UNIXDOMAINSOCKET_INCLUDE_UNIXDOMAINSOCKETSESSIONMANAGER_H_
+

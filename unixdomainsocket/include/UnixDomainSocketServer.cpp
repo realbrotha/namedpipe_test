@@ -11,9 +11,11 @@
 
 #include <iostream>
 #include <thread>
+#include <string_view>
 
 #include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include <sys/socket.h>
 
@@ -79,18 +81,12 @@ bool UnixDomainSocketServer::Finalize() {
   close(epoll_fd_);
 }
 
-#include <sys/ioctl.h>
-#include <stdlib.h>
-
 void *UnixDomainSocketServer::EpollHandler(void *arg) {
   std::cout << "EpollHandler Thread!!!!" << std::endl;
   UnixDomainSocketServer *mgr = reinterpret_cast<UnixDomainSocketServer *>(arg);
   mgr->stopped_ = false;
 
-  int unknown_user_count = 0;
   int errorCount = 0;
-  int target_size = 0;
-
   MessageManager message_manager;
   while (!mgr->stopped_) {
     epoll_event gettingEvent[kMAX_EVENT_COUNT] = {0, {0}};
@@ -101,7 +97,7 @@ void *UnixDomainSocketServer::EpollHandler(void *arg) {
       for (int i = 0; i < event_count; ++i) {
         printf("epoll event index [%d], event type [%d]\n", i, gettingEvent[i].events);
 
-        if (gettingEvent[i].data.fd == mgr->accept_checker_fd_)    // accept
+        if (gettingEvent[i].data.fd == mgr->accept_checker_fd_) // accept
         {
           struct sockaddr_un client_addr;
           int client_socket = 0;
@@ -123,12 +119,11 @@ void *UnixDomainSocketServer::EpollHandler(void *arg) {
         } else { // accept 이후
           int client_fd = gettingEvent[i].data.fd;
           char message[kMAX_READ_SIZE] = {0,};
-          memset (message, 0x00, sizeof(message));
+          memset(message, 0x00, sizeof(message));
           int read_size = read(client_fd, message, sizeof(message));
           if (read_size < 0) {   // read 할게없음
             continue;
-          }
-          else if( read_size == 0) { // Disconnect
+          } else if (read_size == 0) { // Disconnect
             std::cout << "User Disconnect" << std::endl;
             EpollWrapper::EpollControll(mgr->epoll_fd_,
                                         client_fd,
@@ -136,50 +131,54 @@ void *UnixDomainSocketServer::EpollHandler(void *arg) {
                                         EPOLL_CTL_DEL);
             UnixDomainSocketSessionManager::GetInstance().Remove(client_fd);
             continue;
-          } else { // Read 정상.
-            printf("Message Recv!!!!!!! read size :%d\n",read_size);
-            Message msg(reinterpret_cast<const uint8_t *>(message), read_size); // 메세지 제작
+          }
+          // Read 정상.
+          printf("Message Recv!!!!!!! read size :%d\n", read_size);
+          Message msg(reinterpret_cast<const uint8_t *>(message), read_size); // 메세지 제작
+          char read_more[kMAX_READ_SIZE] = {0,};
+          int read_more_size = 0;
+          do  // read more
+          {
+            memset(read_more, 0x00, sizeof(read_more));
+            read_more_size = read(client_fd, read_more, sizeof(read_more));
+            if (read_more_size > 0) {
+              msg.AppendData(read_more, read_more_size); // 메세지 제작
+            }
+          } while (read_more_size > 0);
+          int product = 0;
+          if (UnixDomainSocketSessionManager::GetInstance().GetSocketFdSize() &&
+              !UnixDomainSocketSessionManager::GetInstance().GetProductCode(product, client_fd)) {
+            // product 정보가 없다면 아래를 처리할 이유가 없다.
+            continue;
+          }
 
-            char read_more[kMAX_READ_SIZE] = {0,};
-            int read_more_size = 0;
-            do  // read more
-            {
-              printf ("???????????????\n");
-              memset(read_more, 0x00, sizeof(read_more));
-              read_more_size = read(client_fd, read_more, sizeof(read_more));
-              if (read_more_size > 0) {
-                printf ("read more append size : (%d)\n", read_more_size);
-                msg.AppendData(read_more, read_more_size); // 메세지 제작
-              }
-            } while (read_more_size > 0);
-
-            MessageParser parser(msg);
-
-            if (parser.IsHeader()) { // header 정보가 있을경우
-              std::cout << "this is header!!!!" << std::endl;
-              printf ( "this Message Size : (%d) //data size : (%d)\n", target_size, parser.GetDataSize());
-              printf ("recv Data : (%s)\n", parser.GetData());
-            } else {  // header 정보가 없을 경우
-              printf("!!!!!!!!!read size : %d\n", read_size);
-              std::string buff2(message);
-              if (buff2.find(kFIND_STRING, 0) != std::string::npos) { // 처음 연결된 후 약속된 데이터 처리 제품 코드를 던져서 식별을 한다.
-                int product_type = std::atoi(&buff2.back());
-                printf("product AD!!!!!!!!!! code : %d\n", product_type);
-                UnixDomainSocketSessionManager::GetInstance().Add(product_type, client_fd);
-
-                EpollWrapper::EpollControll(mgr->epoll_fd_,
-                                            client_fd,
-                                            EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLET,
-                                            EPOLL_CTL_MOD);
-              } else {
-                printf("not header \n");
+          MessageParser parser(msg);
+          if (parser.IsHeader()) { // header 정보가 있을경우
+            message_manager.Add(product, msg);
+          } else {  // communicated product type
+            std::string buff(message);
+            if (buff.find(kFIND_STRING, 0) != std::string::npos) { // 처음 연결된 후 약속된 데이터 처리 제품 코드를 던져서 식별을 한다.
+              int product_type = std::atoi(&buff.back());
+              UnixDomainSocketSessionManager::GetInstance().Add(product_type, client_fd);
+            } else { // header -info
+              if (message_manager.IsExistMessage(product)) {
+                Message msg_need_append = message_manager.MessagePop(product);
+                msg_need_append.AppendData(reinterpret_cast<char *>(&msg.GetRawData()[0]), msg.GetMessageSize());
+                message_manager.Add(product, msg_need_append);
               }
             }
           }
+
+          if (message_manager.IsPerfectMessage(product)) {
+            Message msg_complete = message_manager.MessagePop(product);
+            MessageParser msg_parser(msg_complete);
+            printf("*****msg size1 : [%d]*****\n", msg_complete.GetMessageSize());
+            printf("*****msg size2 : [%d]*****\n", msg_parser.GetDataSize());
+            printf("*****Message Done*****\n");
+          }
         }
       }
-    } else if (event_count < 0) // epoll error
-    {
+    } else if (event_count < 0) {  // epoll error
       if (errno == EINTR) {
         continue;
       }
@@ -202,12 +201,23 @@ void *UnixDomainSocketServer::EpollHandler(void *arg) {
 
 bool UnixDomainSocketServer::SendMessageBroadcast(std::string &send_string) {
   bool result = false;
-  std::map<int, int> buffer = UnixDomainSocketSessionManager::GetInstance().GetAllSession();
-
-  if (!buffer.empty()) {
-    std::cout << "server send string : " << send_string << std::endl;
+  std::map<int, int> buffer;;
+  if (UnixDomainSocketSessionManager::GetInstance().GetSocketFdAll(buffer)) {
+    Message send_msg(send_string.c_str(), send_string.length(), 1, 1);
+    std::cout << " send Length : " << send_msg.GetRawData().size() << std::endl;
     for (auto it = buffer.begin(); it != buffer.end(); it++) {
-      write(it->second, send_string.c_str(), send_string.length() + 1);
+      ssize_t data_size = send_msg.GetRawData().size();
+      int next_post = 0;
+      while (next_post < data_size) {
+        size_t write_result_size = write(it->second, &send_msg.GetRawData()[next_post], data_size - next_post);
+        next_post += write_result_size;
+        if (0 < write_result_size) {
+          usleep(100);
+          continue;
+        } else if (write_result_size < send_msg.GetRawData().size()) {
+
+        }
+      }
     }
     result = true;
   }

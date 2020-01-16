@@ -32,6 +32,7 @@ class MessageParser {
 
   bool IsHeader();
   const uint8_t *GetData();
+  int32_t GetHeaderSize() const;
   int32_t GetDataSize() const;
   int32_t GetMessageFullSize() const;
   int16_t GetListenerType() const;
@@ -55,6 +56,7 @@ class Message {
  public:
   friend class MessageParser;
   friend class MessageManager;
+  Message();
   Message(const uint8_t *buff, const size_t message_size);
   Message(const char *data,
           int32_t data_length,
@@ -66,6 +68,7 @@ class Message {
   ~Message();
   std::vector<uint8_t> &GetRawData();
   void AppendData(const char *data, int32_t data_size);
+  int32_t GetMessageSize() const;
  private:
   void SetHeader(int32_t message_length,
                  int16_t listener_type,
@@ -81,10 +84,12 @@ class Message {
 
 class MessageManager {
  public :
-  bool Add(int32_t product_type, Message msg, int32_t message_id);
-  bool Remove(int32_t product_type, Message msg, int32_t message_id);
-  bool IsPerfectMessage(int32_t product_type, int32_t message_id);
+  bool Add(int32_t& product_type, Message& msg);
+  bool Remove(int32_t& product_type);
+  bool IsPerfectMessage(int32_t& product_type);
+  bool IsExistMessage(int32_t& product_type);
+  Message MessagePop(int32_t& product_type);
  private :
-  std::map<int32_t, std::map<int32_t, Message>> message_map_;
+  std::map<int32_t, Message> message_map_;
 };
 #endif //TESTIPC_UNIXDOMAINSOCKET_INCLUDE_MESSAGE_H_
