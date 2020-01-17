@@ -22,7 +22,7 @@ bool MessageParser::Parse(Message &message) {
   message_header_.header_checker = message_header_ptr->header_checker;
   message_header_.message_length = message_header_ptr->message_length;
   message_header_.is_request = message_header_ptr->is_request;
-  message_header_.priority = message_header_ptr->priority;
+  message_header_.need_response = message_header_ptr->need_response;
   message_header_.request_timeout = (message_header_ptr->request_timeout);
   message_header_.listener_type = (message_header_ptr->listener_type);
   message_header_.message_id = (message_header_ptr->message_id);
@@ -41,7 +41,7 @@ bool MessageParser::Parse(const uint8_t *message, const size_t message_length) {
   message_header_.header_checker = message_header_ptr->header_checker;
   message_header_.message_length = message_header_ptr->message_length;
   message_header_.is_request = message_header_ptr->is_request;
-  message_header_.priority = message_header_ptr->priority;
+  message_header_.need_response = message_header_ptr->need_response;
   message_header_.request_timeout = (message_header_ptr->request_timeout);
   message_header_.listener_type = (message_header_ptr->listener_type);
   message_header_.message_id = (message_header_ptr->message_id);
@@ -73,11 +73,11 @@ int16_t MessageParser::GetListenerType() const {
 int32_t MessageParser::GetMessageId() const {
   return message_header_.message_id;
 }
-int16_t MessageParser::GetIsRequest() const {
+int16_t MessageParser::GetIsRequest() const { // Sync = 0 , async =1
   return message_header_.is_request;
 }
-int16_t MessageParser::GetPriority() const {
-  return message_header_.priority;
+int16_t MessageParser::GetNeedResponse() const {
+  return message_header_.need_response;
 }
 int16_t MessageParser::GetRequestTimeOut() const {
   return message_header_.request_timeout;
@@ -89,8 +89,8 @@ Message::Message(const char *data,
                  int32_t data_length,
                  int16_t listener_type,
                  int32_t message_id,
+                 int16_t need_response,
                  int16_t is_request,
-                 int16_t priority,
                  int16_t request_timeout) {
   if (0 > data_length) {
     printf("error\n");
@@ -100,7 +100,7 @@ Message::Message(const char *data,
   message_.resize(sizeof(MessageHeader) + data_length);
   message_size_ = sizeof(MessageHeader) + data_length;
 
-  SetHeader(message_.size(), listener_type, message_id, is_request, priority, request_timeout);
+  SetHeader(message_.size(), listener_type, message_id, is_request, need_response, request_timeout);
   SetBody(data, data_length);
 }
 Message::Message(const uint8_t *buff, const size_t message_size) {
@@ -137,14 +137,14 @@ int32_t Message::GetMessageSize() const{
 void Message::SetHeader(int32_t message_length,
                         int16_t listener_type,
                         int32_t message_id,
+                        int16_t need_response,
                         int16_t is_request,
-                        int16_t priority,
                         int16_t requestTimeout) {
   MessageHeader *h = reinterpret_cast<MessageHeader *>(&message_[0]);
   h->header_checker = 0x98765432;
   h->message_length = message_length;
   h->is_request = is_request;
-  h->priority = priority;
+  h->need_response = need_response;
   h->request_timeout = requestTimeout;
   h->listener_type = listener_type;
   h->message_id = message_id;

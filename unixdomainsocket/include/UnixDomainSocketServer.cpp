@@ -25,16 +25,17 @@ constexpr char kFIND_STRING[] = "product:";
 constexpr int kMAX_EVENT_COUNT = 3;
 constexpr int kMAX_READ_SIZE = 2048;
 }
-UnixDomainSocketServer::UnixDomainSocketServer() {
+
+UnixDomainSocketServer::UnixDomainSocketServer() : epoll_fd_(-1),
+                                                   accept_checker_fd_(-1),
+                                                   server_addr_({0,}){
 }
 
 UnixDomainSocketServer::~UnixDomainSocketServer() {
   Finalize();
 }
 
-bool UnixDomainSocketServer::Initialize() {
-  std::cout << "Server Side Init";
-
+bool UnixDomainSocketServer::Initialize(t_ListenerCallbackProc callback) {
   if (0 == access(kFILE_NAME, F_OK))
     unlink(kFILE_NAME);
 
@@ -42,6 +43,7 @@ bool UnixDomainSocketServer::Initialize() {
     std::cout << "Socket Create Failed" << std::endl;
     return false;
   }
+  async_message_callback_ = callback;
 
   memset(&server_addr_, 0, sizeof(server_addr_));
   server_addr_.sun_family = AF_UNIX;
@@ -82,7 +84,6 @@ bool UnixDomainSocketServer::Finalize() {
 }
 
 void *UnixDomainSocketServer::EpollHandler(void *arg) {
-  std::cout << "EpollHandler Thread!!!!" << std::endl;
   UnixDomainSocketServer *mgr = reinterpret_cast<UnixDomainSocketServer *>(arg);
   mgr->stopped_ = false;
 
@@ -133,16 +134,17 @@ void *UnixDomainSocketServer::EpollHandler(void *arg) {
             continue;
           }
           // Read 정상.
-          printf("Message Recv!!!!!!! read size :%d\n", read_size);
           Message msg(reinterpret_cast<const uint8_t *>(message), read_size); // 메세지 제작
           char read_more[kMAX_READ_SIZE] = {0,};
           int read_more_size = 0;
+          int total_read_size = read_size;
           do  // read more
           {
             memset(read_more, 0x00, sizeof(read_more));
             read_more_size = read(client_fd, read_more, sizeof(read_more));
             if (read_more_size > 0) {
               msg.AppendData(read_more, read_more_size); // 메세지 제작
+              total_read_size += read_more_size;
             }
           } while (read_more_size > 0);
           int product = 0;
@@ -174,6 +176,19 @@ void *UnixDomainSocketServer::EpollHandler(void *arg) {
             MessageParser msg_parser(msg_complete);
             printf("*****msg size1 : [%d]*****\n", msg_complete.GetMessageSize());
             printf("*****msg size2 : [%d]*****\n", msg_parser.GetDataSize());
+
+            int msgid = msg_parser.GetMessageId();
+            for (auto &it : mgr->response_msg_id) {   // response 를 기다려야 하는 메세지들
+              if (it.first == msgid) {
+                printf("match case!!!");
+                mgr->need_response_message_[msgid] = msg_complete;
+                break;
+              }
+            }
+            if (mgr->async_message_callback_) {
+              printf("*****callback function called*****\n");
+              mgr->async_message_callback_(msg_complete);
+            }
             printf("*****Message Done*****\n");
           }
         }
@@ -199,27 +214,81 @@ void *UnixDomainSocketServer::EpollHandler(void *arg) {
   std::cout << "EpollHandler Thread!!!! END OF Thread" << std::endl;
 }
 
+bool UnixDomainSocketServer::WriteMessage(const int write_fd, const void *data_, const ssize_t data_size) {
+  bool result = true;
+  int next_post = 0;
+  while (next_post < data_size) {
+    ssize_t write_result_size = write(write_fd, data_ + next_post, data_size - next_post);
+    if (0 > write_result_size) {
+      usleep(100);
+      continue;
+    } else { // 처리
+      next_post += write_result_size;
+    }
+  }
+  return result;
+}
 bool UnixDomainSocketServer::SendMessageBroadcast(std::string &send_string) {
   bool result = false;
   std::map<int, int> buffer;;
   if (UnixDomainSocketSessionManager::GetInstance().GetSocketFdAll(buffer)) {
-    Message send_msg(send_string.c_str(), send_string.length(), 1, 1);
+    Message send_msg(send_string.c_str(), send_string.length(), 1, ++message_id);
     std::cout << " send Length : " << send_msg.GetRawData().size() << std::endl;
     for (auto it = buffer.begin(); it != buffer.end(); it++) {
       ssize_t data_size = send_msg.GetRawData().size();
-      int next_post = 0;
-      while (next_post < data_size) {
-        size_t write_result_size = write(it->second, &send_msg.GetRawData()[next_post], data_size - next_post);
-        next_post += write_result_size;
-        if (0 < write_result_size) {
-          usleep(100);
-          continue;
-        } else if (write_result_size < send_msg.GetRawData().size()) {
+      if (WriteMessage(it->second, &send_msg.GetRawData()[0], data_size)) result = true;
+    }
+  }
+  printf("Server SendMessage Complete\n");
+  return result;
+}
 
+bool UnixDomainSocketServer::SendMessage(std::string &send_string, int &product_code) {
+  int socket_fd = 0;
+  bool result = false;
+  if (UnixDomainSocketSessionManager::GetInstance().GetSocketFd(product_code, socket_fd)) {
+    Message send_msg(send_string.c_str(), send_string.length(), 1, ++message_id);
+    ssize_t data_size = send_msg.GetRawData().size();
+    std::cout << " send Length : " << send_msg.GetRawData().size() << std::endl;
+    if (WriteMessage(socket_fd, &send_msg.GetRawData()[0], data_size)) result = true;
+  }
+  return result;
+}
+
+bool UnixDomainSocketServer::SendMessage(int msg_id, std::string &send_string, int & product_code) {
+  int socket_fd = 0;
+  bool result = false;
+  if (UnixDomainSocketSessionManager::GetInstance().GetSocketFd(product_code, socket_fd)) {
+    Message send_msg(send_string.c_str(), send_string.length(), 1, msg_id);
+    ssize_t data_size = send_msg.GetRawData().size();
+    std::cout << " send Length : " << send_msg.GetRawData().size() << std::endl;
+    if (WriteMessage(socket_fd, &send_msg.GetRawData()[0], data_size)) result = true;
+  }
+  return result;
+}
+
+std::string UnixDomainSocketServer::SendMessage(std::string &send_string, int product_code, int wait_time) {
+  std::string result;
+  int socket_fd = 0;
+  if (UnixDomainSocketSessionManager::GetInstance().GetSocketFd(product_code, socket_fd)) {
+    Message send_msg(send_string.c_str(), send_string.length(), 1, ++message_id);
+    ssize_t data_size = send_msg.GetRawData().size();
+    response_msg_id[message_id] = true;
+    if (WriteMessage(socket_fd, &send_msg.GetRawData()[0], data_size)) {
+      while (wait_time > 0) {
+        if (need_response_message_.count(message_id)) {
+          MessageParser msg_parser(need_response_message_[message_id]);
+          int data_size = msg_parser.GetDataSize();
+          const char *start_pos = reinterpret_cast<const char *>(msg_parser.GetData());
+          result.assign(start_pos, data_size);
+          break;
+        } else {
+          usleep(1000);
+          wait_time--;
         }
       }
+      response_msg_id.erase(message_id);
     }
-    result = true;
   }
   return result;
 }

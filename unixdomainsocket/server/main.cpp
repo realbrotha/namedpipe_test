@@ -10,10 +10,11 @@ int main(int argc, char *argv[]) {
   UnixDomainSocketInterface impl;
   UnixDomainSocketServer *server;
 
-  bool result = impl.GetInterfaceObject(kINTERFACE_TYPE_SERVER, reinterpret_cast<UnixDomainSocketInterface **>(&server));
+  bool
+      result = impl.GetInterfaceObject(kINTERFACE_TYPE_SERVER, reinterpret_cast<UnixDomainSocketInterface **>(&server));
 
   std::string buffer3;
-  for (int i = 0; i < 1000 *100; ++i) {
+  for (int i = 0; i < 1000 * 100; ++i) {
     buffer3 += "abcde12345";
   }
   if (result && server->Initialize()) {
@@ -25,6 +26,12 @@ int main(int argc, char *argv[]) {
       if (buffer2 == "big") {
         std::cout << "big!!!! send" << std::endl;
         server->SendMessageBroadcast(buffer3);
+      } else if (buffer2 == "5") {
+        printf ("!!!!!!!!!!!!!!!!!!wait send!!!!!!!!!!!");
+        std::string test = "abcde";
+        std::string result ;
+        result = server->SendMessage(test, 1, 0xffffff);
+        printf ("result : %s", result.c_str());
       } else {
         server->SendMessageBroadcast(buffer2);
       }

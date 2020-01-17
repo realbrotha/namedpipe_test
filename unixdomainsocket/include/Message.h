@@ -16,7 +16,7 @@ struct MessageHeader {
   int32_t header_checker;
   int32_t message_length;
   int16_t is_request;
-  int16_t priority;         //< 0: normal, 1: high
+  int16_t need_response;         //< 0: normal, 1: high
   int16_t request_timeout;
   int16_t listener_type;    //< message type
   int32_t message_id;       // message key
@@ -38,7 +38,7 @@ class MessageParser {
   int16_t GetListenerType() const;
   int32_t GetMessageId() const;
   int16_t GetIsRequest() const;
-  int16_t GetPriority() const;
+  int16_t GetNeedResponse() const;
   int16_t GetRequestTimeOut() const;
 
  private:
@@ -62,8 +62,8 @@ class Message {
           int32_t data_length,
           int16_t listener_type,
           int32_t message_id,
+          int16_t need_response = 0,
           int16_t is_request = 0,
-          int16_t priority = 0,
           int16_t request_timeout = 0);
   ~Message();
   std::vector<uint8_t> &GetRawData();
@@ -73,8 +73,8 @@ class Message {
   void SetHeader(int32_t message_length,
                  int16_t listener_type,
                  int32_t message_id,
+                 int16_t need_response,
                  int16_t is_request,
-                 int16_t priority,
                  int16_t requestTimeout);
   void SetBody(const char *data, const int size);
 
