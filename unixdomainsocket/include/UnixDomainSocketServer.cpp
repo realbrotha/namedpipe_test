@@ -254,7 +254,7 @@ bool UnixDomainSocketServer::SendMessage(std::string &send_string, int &product_
   }
   return result;
 }
-
+0l
 bool UnixDomainSocketServer::SendMessage(int msg_id, std::string &send_string, int & product_code) {
   int socket_fd = 0;
   bool result = false;

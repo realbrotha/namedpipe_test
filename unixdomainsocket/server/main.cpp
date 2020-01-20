@@ -40,5 +40,6 @@ int main(int argc, char *argv[]) {
   } else {
     std::cout << "server init failed";
   }
+  impl.Release();
   std::cout << "Lead Fin";
 }

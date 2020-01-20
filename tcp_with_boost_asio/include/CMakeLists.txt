@@ -3,10 +3,14 @@ cmake_minimum_required(VERSION 3.5)
 set(MODULE_NAME asio_controller)
 
 set(SOURCES
-        NamedPipeManager.cpp
-        NamedPipeWrapper.cpp
+        AsioClient.cpp
+        AsioServer.cpp
+        AsioFactory.h
+        AsioInterface.cpp
         FileDescriptorTool.cpp
         StringTool.cpp)
+
+include_directories(${INC_PATH})
 
 add_library(${MODULE_NAME} STATIC ${SOURCES})
 find_package(Threads REQUIRED)
