@@ -3,13 +3,6 @@
 //
 
 #include "AsioInterface.h"
-#include "AsioServer.h"
-#include "AsioClient.h"
-
-namespace {
-constexpr int kCLIENT = 1;
-constexpr int kSERVER = 2;
-}
 
 AsioInterface::AsioInterface() {
 
@@ -23,7 +16,7 @@ bool AsioInterface::GetInterfaceObject(unsigned int type, AsioInterface **out_in
   AsioInterface *interface_object = nullptr;
 
   switch (type) {
-    case kCLIENT : {
+    case INTERFACE_TYPE::CLIENT : {
       AsioClient *client_object = nullptr;
       client_object = new AsioClient;
       if (client_object) {
@@ -32,7 +25,7 @@ bool AsioInterface::GetInterfaceObject(unsigned int type, AsioInterface **out_in
       }
       break;
     }
-    case kSERVER : {
+    case INTERFACE_TYPE::SERVER : {
       AsioServer *server_object = nullptr;
       server_object = new AsioServer;
 
@@ -43,5 +36,6 @@ bool AsioInterface::GetInterfaceObject(unsigned int type, AsioInterface **out_in
       break;
     }
   }
+  *out_interface_ptr = interface_object;
   return result;
 }

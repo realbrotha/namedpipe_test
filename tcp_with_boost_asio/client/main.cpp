@@ -2,5 +2,5 @@
 
 int main(int argc, char* argv[])
 {
-  std::cout << "Client \n";
+  std::cout << "Asio Client \n";
 }

@@ -8,6 +8,8 @@ set(SOURCES
 
 include_directories(${INC_PATH})
 
+find_package(Threads)
+
 add_executable(${MODULE_NAME} ${SOURCES})
 
 target_link_libraries(${MODULE_NAME}

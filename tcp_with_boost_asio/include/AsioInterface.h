@@ -6,6 +6,13 @@
 #define TESTIPC_TCP_WITH_BOOST_ASIO_INCLUDE_ASIOINTERFACE_H_
 
 #include "AsioFactory.h"
+#include "AsioServer.h"
+#include "AsioClient.h"
+
+enum INTERFACE_TYPE {
+  CLIENT = 1,
+  SERVER = 2
+};
 
 class AsioInterface : public AsioFactory {
  public :
